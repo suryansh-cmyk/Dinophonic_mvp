@@ -1,12 +1,35 @@
-import { Stack } from 'expo-router';
+import { Slot, useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { useChildStore } from '../store/childStore';
+import { useProgressStore } from '../store/progressStore';
+import { getProgress } from '../lib/supabase';
 
 export default function RootLayout() {
-  return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="onboarding" />
-      <Stack.Screen name="lesson/[soundId]" />
-      <Stack.Screen name="game/egg-hatch" />
-    </Stack>
-  );
+  const router = useRouter();
+  const { child, isLoading, hydrate } = useChildStore();
+  const { setProgress } = useProgressStore();
+
+  useEffect(() => {
+    hydrate();
+  }, []);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!child) {
+      router.replace('/onboarding');
+      return;
+    }
+    getProgress(child.id).then(setProgress).catch(console.error);
+  }, [isLoading, child]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#1B5E20', alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#FFD600" />
+      </View>
+    );
+  }
+
+  return <Slot />;
 }

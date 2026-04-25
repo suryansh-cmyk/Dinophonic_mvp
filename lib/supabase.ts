@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
+console.log('Supabase URL loaded:', !!supabaseUrl, supabaseUrl?.slice(0, 30));
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export type Child = {
@@ -49,6 +51,16 @@ export async function seedProgress(childId: string): Promise<void> {
   }));
   const { error } = await supabase.from('progress').insert(rows);
   if (error) throw error;
+}
+
+export async function getChildById(id: string): Promise<Child | null> {
+  const { data, error } = await supabase
+    .from('children')
+    .select('*')
+    .eq('id', id)
+    .single();
+  if (error) return null;
+  return data;
 }
 
 export async function updateProgressStatus(
