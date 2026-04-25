@@ -39,8 +39,7 @@ export default function Onboarding() {
       setProgress(progress);
       router.replace('/');
     } catch (e) {
-      console.error('Onboarding error:', JSON.stringify(e));
-      console.error('Onboarding error detail:', e);
+      console.error('Onboarding error:', e);
       setIsSubmitting(false);
     }
   }
