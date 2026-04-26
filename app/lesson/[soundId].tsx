@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getSoundById } from '../../constants/sounds';
 import MeetStep from '../../components/lesson/MeetStep';
@@ -11,10 +11,12 @@ export default function Lesson() {
   const sound = getSoundById(soundId);
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  if (!sound) {
-    router.replace('/');
-    return null;
-  }
+  // Navigate away in an effect, never synchronously during render
+  useEffect(() => {
+    if (!sound) router.replace('/');
+  }, [sound, router]);
+
+  if (!sound) return null;
 
   function advance() {
     if (step === 3) {
@@ -24,7 +26,15 @@ export default function Lesson() {
     }
   }
 
-  if (step === 1) return <MeetStep sound={sound} onNext={advance} />;
-  if (step === 2) return <HearStep sound={sound} onNext={advance} />;
-  return <TraceStep sound={sound} onNext={advance} />;
+  function goBack() {
+    if (step === 1) {
+      router.replace('/');
+    } else {
+      setStep((s) => (s - 1) as 1 | 2 | 3);
+    }
+  }
+
+  if (step === 1) return <MeetStep sound={sound} onNext={advance} onBack={goBack} step={step} />;
+  if (step === 2) return <HearStep sound={sound} onNext={advance} onBack={goBack} step={step} />;
+  return <TraceStep sound={sound} onNext={advance} onBack={goBack} step={step} />;
 }

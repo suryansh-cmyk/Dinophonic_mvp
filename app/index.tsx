@@ -20,6 +20,7 @@ export default function WorldMap() {
   const { child, clearChild } = useChildStore();
   const { progress, setProgress } = useProgressStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   function getStatus(soundId: string): 'locked' | 'unlocked' | 'complete' {
     const row = progress.find((p) => p.sound_id === soundId);
@@ -27,8 +28,7 @@ export default function WorldMap() {
   }
 
   function handleDinoPress(soundId: string) {
-    const status = getStatus(soundId);
-    if (status !== 'locked') {
+    if (getStatus(soundId) !== 'locked') {
       router.push(`/lesson/${soundId}`);
     }
   }
@@ -38,8 +38,12 @@ export default function WorldMap() {
     clearChild();
     setProgress([]);
     setShowSettings(false);
+    setConfirmReset(false);
     router.replace('/onboarding');
   }
+
+  const completedCount = progress.filter((p) => p.status === 'complete').length;
+  const totalSounds = SOUNDS.length;
 
   return (
     <ImageBackground
@@ -55,10 +59,22 @@ export default function WorldMap() {
             {child && (
               <Text style={styles.greeting}>Hello, {child.name}! 👋</Text>
             )}
+            <Text style={styles.progressLabel}>
+              {completedCount}/{totalSounds} sounds learned
+            </Text>
+            <View style={styles.progressBarTrack}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${(completedCount / totalSounds) * 100}%` as `${number}%` },
+                ]}
+              />
+            </View>
           </View>
           <TouchableOpacity
             onPress={() => setShowSettings(true)}
             style={styles.settingsBtn}
+            accessibilityLabel="Settings"
           >
             <Text style={styles.settingsIcon}>⚙️</Text>
           </TouchableOpacity>
@@ -93,12 +109,33 @@ export default function WorldMap() {
           <View style={styles.modalOverlay}>
             <View style={styles.modal}>
               <Text style={styles.modalTitle}>Settings</Text>
-              <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
-                <Text style={styles.resetText}>🔄 Reset Progress</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setShowSettings(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
+
+              {!confirmReset ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.resetBtn}
+                    onPress={() => setConfirmReset(true)}
+                    accessibilityLabel="Reset all progress"
+                  >
+                    <Text style={styles.resetText}>🔄 Reset Progress</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setShowSettings(false)}>
+                    <Text style={styles.cancelText}>Cancel</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.confirmText}>
+                    This will erase all your progress. Are you sure?
+                  </Text>
+                  <TouchableOpacity style={styles.resetBtn} onPress={handleReset}>
+                    <Text style={styles.resetText}>Yes, Reset</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => setConfirmReset(false)}>
+                    <Text style={styles.cancelText}>Keep my progress</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </Modal>
@@ -136,6 +173,25 @@ const styles = StyleSheet.create({
     color: '#C8E6C9',
     marginTop: 2,
   },
+  progressLabel: {
+    fontSize: 13,
+    color: '#FFD600',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  progressBarTrack: {
+    height: 6,
+    width: 140,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 3,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: 6,
+    backgroundColor: '#FFD600',
+    borderRadius: 3,
+  },
   settingsBtn: {
     padding: 8,
   },
@@ -164,13 +220,21 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 32,
     alignItems: 'center',
-    width: 280,
+    width: 300,
     gap: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  confirmText: {
+    fontSize: 15,
+    color: '#C8E6C9',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   resetBtn: {
     backgroundColor: '#F44336',

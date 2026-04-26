@@ -6,7 +6,7 @@ import { useChildStore } from './childStore';
 type ProgressState = {
   progress: Progress[];
   setProgress: (progress: Progress[]) => void;
-  markComplete: (soundId: string) => Promise<void>;
+  markComplete: (soundId: string, masteryScore?: number) => Promise<void>;
   markUnlocked: (soundId: string) => Promise<void>;
 };
 
@@ -17,17 +17,18 @@ async function saveProgressLocally(progress: Progress[]) {
 export const useProgressStore = create<ProgressState>((set, get) => ({
   progress: [],
   setProgress: (progress) => set({ progress }),
-  markComplete: async (soundId) => {
+  markComplete: async (soundId, masteryScore = 0) => {
     const updated = get().progress.map((p) =>
-      p.sound_id === soundId ? { ...p, status: 'complete' as const } : p
+      p.sound_id === soundId
+        ? { ...p, status: 'complete' as const, mastery_score: masteryScore }
+        : p
     );
     set({ progress: updated });
     await saveProgressLocally(updated);
 
-    // Sync to Supabase in the background
     const childId = useChildStore.getState().child?.id;
     if (childId) {
-      updateProgressStatus(childId, soundId, 'complete').catch(() => {});
+      updateProgressStatus(childId, soundId, 'complete', masteryScore).catch(() => {});
     }
   },
   markUnlocked: async (soundId) => {
@@ -37,7 +38,6 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
     set({ progress: updated });
     await saveProgressLocally(updated);
 
-    // Sync to Supabase in the background
     const childId = useChildStore.getState().child?.id;
     if (childId) {
       updateProgressStatus(childId, soundId, 'unlocked').catch(() => {});

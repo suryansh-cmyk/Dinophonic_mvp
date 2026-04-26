@@ -11,11 +11,12 @@ export function useAudioPlayer() {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
-      await Audio.setAudioModeAsync({ playsInSilentModeIOS: true });
       const { sound } = await Audio.Sound.createAsync(source);
       soundRef.current = sound;
       await sound.playAsync();
-    } catch {}
+    } catch (e) {
+      if (__DEV__) console.warn('[AudioPlayer] play error:', e);
+    }
   }
 
   async function stop() {
@@ -25,7 +26,9 @@ export function useAudioPlayer() {
         await soundRef.current.unloadAsync();
         soundRef.current = null;
       }
-    } catch {}
+    } catch (e) {
+      if (__DEV__) console.warn('[AudioPlayer] stop error:', e);
+    }
   }
 
   useEffect(() => {

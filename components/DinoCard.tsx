@@ -21,6 +21,14 @@ export default function DinoCard({ sound, status, onPress }: Props) {
         ])
       );
       animRef.current.start();
+    } else if (status === 'complete') {
+      animRef.current = Animated.loop(
+        Animated.sequence([
+          Animated.timing(bounceAnim, { toValue: -3, duration: 1200, useNativeDriver: true }),
+          Animated.timing(bounceAnim, { toValue: 0, duration: 1200, useNativeDriver: true }),
+        ])
+      );
+      animRef.current.start();
     } else {
       animRef.current?.stop();
       bounceAnim.setValue(0);
@@ -36,6 +44,8 @@ export default function DinoCard({ sound, status, onPress }: Props) {
       disabled={isLocked}
       style={styles.container}
       activeOpacity={0.8}
+      accessibilityLabel={`${sound.dinoName}, sound ${sound.symbol}, ${status}`}
+      accessibilityState={{ disabled: isLocked }}
     >
       <View style={[styles.card, { borderColor: isLocked ? 'transparent' : sound.color }]}>
         <Animated.View style={{ transform: [{ translateY: bounceAnim }] }}>
@@ -44,6 +54,16 @@ export default function DinoCard({ sound, status, onPress }: Props) {
             style={[styles.image, isLocked && styles.imageGreyed]}
           />
         </Animated.View>
+
+        {/* Sound letter badge — top left */}
+        <View
+          style={[
+            styles.letterBadge,
+            { backgroundColor: isLocked ? 'rgba(255,255,255,0.15)' : sound.color },
+          ]}
+        >
+          <Text style={styles.letterBadgeText}>{sound.symbol}</Text>
+        </View>
 
         {isLocked && (
           <View style={styles.lockOverlay}>
@@ -87,6 +107,21 @@ const styles = StyleSheet.create({
   },
   imageGreyed: {
     opacity: 0.35,
+  },
+  letterBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  letterBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   lockOverlay: {
     position: 'absolute',

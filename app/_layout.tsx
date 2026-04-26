@@ -1,7 +1,8 @@
 import { Slot, useRouter } from 'expo-router';
 import { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 import { useChildStore } from '../store/childStore';
 import { useProgressStore } from '../store/progressStore';
 import { getProgress } from '../lib/supabase';
@@ -13,6 +14,8 @@ export default function RootLayout() {
   const { setProgress } = useProgressStore();
 
   useEffect(() => {
+    // Set once at app startup — not on every audio play call
+    Audio.setAudioModeAsync({ playsInSilentModeIOS: true }).catch(() => {});
     hydrate();
   }, []);
 
@@ -22,18 +25,38 @@ export default function RootLayout() {
       router.replace('/onboarding');
       return;
     }
-    AsyncStorage.getItem('progressData').then((local) => {
-      if (local) setProgress(JSON.parse(local) as Progress[]);
-    });
-    getProgress(child.id).then(setProgress).catch(() => {});
-  }, [isLoading, child]);
+    // Local first (instant, works offline), then Supabase overwrites if available
+    AsyncStorage.getItem('progressData')
+      .then((local) => {
+        if (local) {
+          try {
+            setProgress(JSON.parse(local) as Progress[]);
+          } catch {
+            // Corrupt local data — clear it and wait for Supabase
+            AsyncStorage.removeItem('progressData').catch(() => {});
+          }
+        }
+        return getProgress(child.id);
+      })
+      .then((remote) => {
+        if (remote.length > 0) {
+          setProgress(remote);
+          AsyncStorage.setItem('progressData', JSON.stringify(remote)).catch(() => {});
+        }
+      })
+      .catch(() => {
+        // Supabase unavailable — local data already loaded above
+      });
+  }, [isLoading, child, router]);
 
   return (
     <>
       <Slot />
       {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#FFD600" />
+        <View style={styles.splash}>
+          <Text style={styles.splashEmoji}>🦕</Text>
+          <Text style={styles.splashTitle}>Dinophonics</Text>
+          <ActivityIndicator size="large" color="#FFD600" style={styles.spinner} />
         </View>
       )}
     </>
@@ -41,10 +64,22 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  loadingOverlay: {
+  splash: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#1B5E20',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  splashEmoji: {
+    fontSize: 72,
+  },
+  splashTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#FFD600',
+  },
+  spinner: {
+    marginTop: 32,
   },
 });

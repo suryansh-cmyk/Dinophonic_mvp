@@ -23,20 +23,32 @@ export const useChildStore = create<ChildState>((set) => ({
         return;
       }
 
-      // Try local cache first (instant, works offline)
+      // Try local cache first — instant, works offline
       const localData = await AsyncStorage.getItem('childData');
       if (localData) {
-        set({ child: JSON.parse(localData) as Child, isLoading: false });
-        // Sync from Supabase in the background
-        getChildById(childId).then((remote) => {
-          if (remote) set({ child: remote });
-        }).catch(() => {});
+        try {
+          set({ child: JSON.parse(localData) as Child, isLoading: false });
+        } catch {
+          // Corrupt cache — clear and fall through to Supabase
+          await AsyncStorage.removeItem('childData');
+        }
+
+        // Refresh from Supabase in background and keep local cache current
+        getChildById(childId)
+          .then(async (remote) => {
+            if (remote) {
+              set({ child: remote });
+              await AsyncStorage.setItem('childData', JSON.stringify(remote));
+            }
+          })
+          .catch(() => {});
         return;
       }
 
-      // Fall back to Supabase if no local cache
+      // No local cache — fetch from Supabase
       const child = await getChildById(childId);
       if (!child) {
+        // Stale childId (e.g. row deleted from Supabase) — force re-onboarding
         await AsyncStorage.removeItem('childId');
         set({ isLoading: false });
         return;

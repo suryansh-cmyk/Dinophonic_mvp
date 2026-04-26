@@ -59,6 +59,7 @@ export default function Onboarding() {
       mastery_score: 0,
     }));
 
+    // Write locally first — app is usable offline immediately
     await AsyncStorage.setItem('childId', childId);
     await AsyncStorage.setItem('childData', JSON.stringify(localChild));
     await AsyncStorage.setItem('progressData', JSON.stringify(localProgress));
@@ -67,10 +68,25 @@ export default function Onboarding() {
     setProgress(localProgress);
     router.replace('/');
 
-    // Sync to Supabase in the background — non-blocking
+    // Sync to Supabase in background — updates stored IDs with canonical remote UUIDs
     createChild(trimmedName, avatarSoundId)
-      .then((remoteChild) => seedProgress(remoteChild.id))
-      .catch(() => {});
+      .then(async (remoteChild) => {
+        await seedProgress(remoteChild.id);
+
+        // Fetch the seeded rows so we have Supabase-generated IDs for future syncs
+        const remoteProgress = await getProgress(remoteChild.id);
+
+        await AsyncStorage.multiSet([
+          ['childId', remoteChild.id],
+          ['childData', JSON.stringify(remoteChild)],
+          ['progressData', JSON.stringify(remoteProgress)],
+        ]);
+        setChild(remoteChild);
+        if (remoteProgress.length > 0) setProgress(remoteProgress);
+      })
+      .catch(() => {
+        // Fully offline — local IDs remain active, app works normally
+      });
   }
 
   return (
@@ -84,6 +100,8 @@ export default function Onboarding() {
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Dinophonics</Text>
+        <Text style={styles.tagline}>Learn letter sounds with dinosaurs!</Text>
+
         <Text style={styles.subtitle}>What's your name?</Text>
         <TextInput
           style={styles.input}
@@ -93,6 +111,7 @@ export default function Onboarding() {
           placeholderTextColor="#A5D6A7"
           maxLength={30}
           autoFocus
+          accessibilityLabel="Enter your name"
         />
 
         <Text style={styles.subtitle}>Pick your dino!</Text>
@@ -101,28 +120,38 @@ export default function Onboarding() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.avatarRow}
         >
-          {SOUNDS.map((sound) => (
-            <TouchableOpacity
-              key={sound.id}
-              onPress={() => setAvatarSoundId(sound.id)}
-              style={[
-                styles.avatarCard,
-                avatarSoundId === sound.id && { borderColor: sound.color, borderWidth: 4 },
-              ]}
-            >
-              <Image source={sound.imageFile} style={styles.avatarImage} />
-              <Text style={styles.avatarName}>{sound.dinoName}</Text>
-            </TouchableOpacity>
-          ))}
+          {SOUNDS.map((sound) => {
+            const selected = avatarSoundId === sound.id;
+            return (
+              <TouchableOpacity
+                key={sound.id}
+                onPress={() => setAvatarSoundId(sound.id)}
+                style={[
+                  styles.avatarCard,
+                  selected && { borderColor: sound.color, borderWidth: 4 },
+                ]}
+                accessibilityLabel={`Choose ${sound.dinoName}`}
+                accessibilityState={{ selected }}
+              >
+                <Image source={sound.imageFile} style={styles.avatarImage} />
+                <Text style={styles.avatarName}>{sound.dinoName}</Text>
+                <Text style={[styles.avatarSound, { color: selected ? sound.color : '#A5D6A7' }]}>
+                  {sound.symbol}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
         <TouchableOpacity
           style={[styles.button, !canProceed && styles.buttonDisabled]}
           onPress={handleSubmit}
           disabled={!canProceed || isSubmitting}
+          accessibilityLabel="Start learning"
+          accessibilityState={{ disabled: !canProceed || isSubmitting }}
         >
           <Text style={styles.buttonText}>
-            {isSubmitting ? 'Loading...' : "Let's go! 🦕"}
+            {isSubmitting ? 'Starting...' : "Let's go! 🦕"}
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -146,6 +175,11 @@ const styles = StyleSheet.create({
     fontSize: 48,
     fontWeight: 'bold',
     color: '#fff',
+    marginBottom: 4,
+  },
+  tagline: {
+    fontSize: 16,
+    color: '#A5D6A7',
     marginBottom: 8,
   },
   subtitle: {
@@ -164,6 +198,8 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     width: '100%',
     textAlign: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   avatarRow: {
     paddingVertical: 8,
@@ -186,8 +222,14 @@ const styles = StyleSheet.create({
   avatarName: {
     color: '#fff',
     fontSize: 11,
-    marginTop: 6,
+    marginTop: 4,
     textAlign: 'center',
+    fontWeight: '600',
+  },
+  avatarSound: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   button: {
     backgroundColor: '#FFD600',

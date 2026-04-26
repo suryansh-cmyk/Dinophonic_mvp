@@ -1,7 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
+import { SOUND_ORDER } from '../constants/sounds';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    'Missing Supabase env vars. Create dinophonics/.env.local with ' +
+    'EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.'
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -41,8 +49,7 @@ export async function getProgress(childId: string): Promise<Progress[]> {
 }
 
 export async function seedProgress(childId: string): Promise<void> {
-  const soundOrder = ['s', 'a', 't', 'i', 'p', 'n'];
-  const rows = soundOrder.map((sound_id, i) => ({
+  const rows = SOUND_ORDER.map((sound_id, i) => ({
     child_id: childId,
     sound_id,
     status: i === 0 ? 'unlocked' : 'locked',
@@ -64,11 +71,16 @@ export async function getChildById(id: string): Promise<Child | null> {
 export async function updateProgressStatus(
   childId: string,
   soundId: string,
-  status: 'unlocked' | 'complete'
+  status: 'unlocked' | 'complete',
+  masteryScore?: number
 ): Promise<void> {
   const { error } = await supabase
     .from('progress')
-    .update({ status, last_played_at: new Date().toISOString() })
+    .update({
+      status,
+      last_played_at: new Date().toISOString(),
+      ...(masteryScore !== undefined && { mastery_score: masteryScore }),
+    })
     .eq('child_id', childId)
     .eq('sound_id', soundId);
   if (error) throw error;
