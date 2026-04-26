@@ -1,50 +1,30 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getSoundById } from '../../constants/sounds';
+import MeetStep from '../../components/lesson/MeetStep';
+import HearStep from '../../components/lesson/HearStep';
+import TraceStep from '../../components/lesson/TraceStep';
 
 export default function Lesson() {
   const { soundId } = useLocalSearchParams<{ soundId: string }>();
   const router = useRouter();
   const sound = getSoundById(soundId);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Lesson: {sound?.dinoName ?? soundId}</Text>
-      <Text style={styles.subtitle}>Coming in Part 5!</Text>
-      <TouchableOpacity style={styles.back} onPress={() => router.replace('/')}>
-        <Text style={styles.backText}>← Back to Map</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  if (!sound) {
+    router.replace('/');
+    return null;
+  }
+
+  function advance() {
+    if (step === 3) {
+      router.push(`/game/egg-hatch?soundId=${soundId}`);
+    } else {
+      setStep((s) => (s + 1) as 1 | 2 | 3);
+    }
+  }
+
+  if (step === 1) return <MeetStep sound={sound} onNext={advance} />;
+  if (step === 2) return <HearStep sound={sound} onNext={advance} />;
+  return <TraceStep sound={sound} onNext={advance} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1B5E20',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#C8E6C9',
-  },
-  back: {
-    marginTop: 24,
-    backgroundColor: '#FFD600',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 16,
-  },
-  backText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1B5E20',
-  },
-});
