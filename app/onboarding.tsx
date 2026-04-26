@@ -15,7 +15,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createChild, seedProgress, getProgress } from '../lib/supabase';
 import { useChildStore } from '../store/childStore';
 import { useProgressStore } from '../store/progressStore';
-import { SOUNDS } from '../constants/sounds';
+import { SOUNDS, SOUND_ORDER } from '../constants/sounds';
+import type { Child, Progress } from '../lib/supabase';
+
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 export default function Onboarding() {
   const [name, setName] = useState('');
@@ -30,18 +39,38 @@ export default function Onboarding() {
   async function handleSubmit() {
     if (!canProceed || isSubmitting) return;
     setIsSubmitting(true);
-    try {
-      const child = await createChild(name.trim(), avatarSoundId);
-      await seedProgress(child.id);
-      const progress = await getProgress(child.id);
-      await AsyncStorage.setItem('childId', child.id);
-      setChild(child);
-      setProgress(progress);
-      router.replace('/');
-    } catch (e) {
-      console.error('Onboarding error:', e);
-      setIsSubmitting(false);
-    }
+
+    const childId = generateId();
+    const trimmedName = name.trim();
+
+    const localChild: Child = {
+      id: childId,
+      name: trimmedName,
+      avatar_sound_id: avatarSoundId,
+      created_at: new Date().toISOString(),
+    };
+
+    const localProgress: Progress[] = SOUND_ORDER.map((sound_id, i) => ({
+      id: generateId(),
+      child_id: childId,
+      sound_id,
+      status: i === 0 ? 'unlocked' : 'locked',
+      last_played_at: null,
+      mastery_score: 0,
+    }));
+
+    await AsyncStorage.setItem('childId', childId);
+    await AsyncStorage.setItem('childData', JSON.stringify(localChild));
+    await AsyncStorage.setItem('progressData', JSON.stringify(localProgress));
+
+    setChild(localChild);
+    setProgress(localProgress);
+    router.replace('/');
+
+    // Sync to Supabase in the background — non-blocking
+    createChild(trimmedName, avatarSoundId)
+      .then((remoteChild) => seedProgress(remoteChild.id))
+      .catch(() => {});
   }
 
   return (
